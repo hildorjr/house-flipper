@@ -2,12 +2,16 @@
 
 ## 1. Supabase
 
-Create a project, then collect both connection strings from **Project Settings → Database**. The app uses the pooled connection at runtime and the direct connection for migrations.
+Create a project, then copy both connection strings from the dashboard **Connect** dialog. The app uses transaction mode at runtime and session mode for migrations.
 
-| Variable | Connection | Port |
-| --- | --- | --- |
-| `DATABASE_URL` | Pooler, append `?pgbouncer=true` | 6543 |
-| `DIRECT_URL` | Direct | 5432 |
+| Variable | Connect tab | Host | Port |
+| --- | --- | --- | --- |
+| `DATABASE_URL` | Transaction pooler, append `?pgbouncer=true` | `aws-<n>-<region>.pooler.supabase.com` | 6543 |
+| `DIRECT_URL` | Session pooler | `aws-<n>-<region>.pooler.supabase.com` | 5432 |
+
+Do not point `DIRECT_URL` at the direct `db.<ref>.supabase.co` endpoint. On the free tier that host resolves over IPv6 only, and Vercel builds run on IPv4, so `prisma migrate deploy` fails with an unreachable database. Both pooler endpoints are IPv4 on every tier.
+
+Copy the hostname from the dashboard rather than assembling it by hand; the `aws-<n>` prefix varies between projects.
 
 Two further steps:
 
