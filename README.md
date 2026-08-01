@@ -55,9 +55,13 @@ Server-only values live behind `serverEnv()`; `clientEnv` exposes the `NEXT_PUBL
 
 ### E2E in CI
 
-`npx playwright test` locally still starts `npm run dev`. When `CI` is set, the Playwright `webServer` starts `npm run start` instead and injects `MOCK_THIRD_PARTY`, `NEXT_PUBLIC_E2E` and `NEXT_PUBLIC_APP_URL` so the suite runs against the production build. The mock "Preencher formulário" buttons render when `NODE_ENV=development` **or** `NEXT_PUBLIC_E2E=true`; the flag must be set at build time because it is inlined into the client bundle.
+`npx playwright test` locally still starts `npm run dev`. When `CI` is set, the Playwright `webServer` starts `npm run start` instead and injects `MOCK_THIRD_PARTY`, `E2E_MOCKS`, `NEXT_PUBLIC_E2E` and `NEXT_PUBLIC_APP_URL` so the suite runs against the production build. The mock "Preencher formulário" buttons render when `NODE_ENV=development` **or** `NEXT_PUBLIC_E2E=true`; the flag must be set at build time because it is inlined into the client bundle.
 
-Next.js inlines `process.env.NODE_ENV` as `production` into every production bundle, so `isMockThirdParty()` in `src/lib/mock/enabled.ts` still refuses to enable mocks against `npm run start`. Running mocked e2e on a production build requires that guard to accept the same explicit test flag (`NEXT_PUBLIC_E2E === "true"`).
+Next.js inlines `process.env.NODE_ENV` as `production` into every production bundle, so `isMockThirdParty()` would otherwise refuse to enable mocks against `npm run start`. The guard accepts the server-only `E2E_MOCKS=true` flag as an exemption, and still refuses whenever `VERCEL_ENV` is present, so mocks can never be enabled on a real deployment.
+
+## Deployment
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for the Vercel, Supabase and Stripe setup.
 
 ## Product notes
 
