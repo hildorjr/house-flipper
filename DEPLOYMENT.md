@@ -55,11 +55,11 @@ Never set `MOCK_THIRD_PARTY`, `E2E_MOCKS`, or `NEXT_PUBLIC_E2E` on Vercel. Mock 
 
 ## 4. Migrations
 
-`vercel.json` sets the build command to `prisma migrate deploy && npm run build`, so migrations apply on every deploy.
+`vercel.json` sets the build command to `prisma migrate deploy && npm run db:seed && npm run build`, so every deploy applies migrations and refreshes reference data.
 
-This means a Preview deployment migrates whichever database its own `DIRECT_URL` points at. Give previews a separate database, or leave the preview environment variables unset so previews do not build.
+The seed is safe to run against production. It inserts no demo users or properties, only the expense categories and renovation presets the app requires, and every row is an upsert keyed on a unique `key`. Skipping it leaves the cost and renovation features with nothing to select.
 
-Never run `npm run db:seed` against production; it inserts demo data.
+Because migrations run at build time, a Preview deployment migrates whichever database its own `DIRECT_URL` points at. Give previews a separate database, or leave the preview environment variables unset so previews do not build.
 
 ## 5. Cron
 

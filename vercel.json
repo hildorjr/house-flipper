@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "prisma migrate deploy && npm run build",
+  "buildCommand": "prisma migrate deploy && npm run db:seed && npm run build",
   "regions": ["gru1"],
   "crons": [
     {
