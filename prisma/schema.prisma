@@ -1,0 +1,414 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PropertyStatus {
+  PROSPECT
+  UNDER_CONTRACT
+  OWNED_RENOVATING
+  LISTED
+  SOLD
+  ARCHIVED
+}
+
+enum PropertyType {
+  HOUSE
+  APARTMENT
+  LAND
+  COMMERCIAL
+  OTHER
+}
+
+enum AcquisitionChannel {
+  JUDICIAL_AUCTION
+  EXTRAJUDICIAL_AUCTION
+  BANK_DIRECT_SALE
+  PRIVATE_SALE
+  INHERITANCE
+  OTHER
+}
+
+enum CostGroup {
+  ACQUISITION
+  TAXES_AND_FEES
+  RENOVATION
+  HOLDING
+  FINANCING
+  SELLING
+  OTHER
+}
+
+enum ExpenseStatus {
+  PLANNED
+  PENDING
+  PAID
+}
+
+enum PaymentMethod {
+  PIX
+  CARD
+  BOLETO
+  CASH
+  TRANSFER
+  FINANCED
+  OTHER
+}
+
+enum Frequency {
+  MONTHLY
+  BIMONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  YEARLY
+}
+
+enum AmortizationSystem {
+  SAC
+  PRICE
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  DONE
+}
+
+enum TradeType {
+  MASON
+  ELECTRICIAN
+  PLUMBER
+  PAINTER
+  CARPENTER
+  GLAZIER
+  ROOFER
+  ARCHITECT
+  ENGINEER
+  LAWYER
+  BROKER
+  CLEANER
+  MOVER
+  GENERAL
+  OTHER
+}
+
+enum AttachmentKind {
+  RECEIPT
+  INVOICE
+  CONTRACT
+  DEED
+  PHOTO_BEFORE
+  PHOTO_AFTER
+  REPORT
+  OTHER
+}
+
+enum PlanTier {
+  FREE
+  PRO
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+}
+
+model Profile {
+  id               String   @id @db.Uuid
+  email            String?
+  phone            String?
+  fullName         String?
+  locale           String   @default("pt-BR")
+  currency         String   @default("BRL")
+  country          String   @default("BR")
+  stripeCustomerId String?  @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  subscription      Subscription?
+  properties        Property[]
+  contacts          Contact[]
+  dealAnalyses      DealAnalysis[]
+  expenseCategories ExpenseCategory[]
+}
+
+model Subscription {
+  id                   String             @id @default(uuid()) @db.Uuid
+  ownerId              String             @unique @db.Uuid
+  owner                Profile            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  tier                 PlanTier           @default(FREE)
+  status               SubscriptionStatus @default(ACTIVE)
+  stripeSubscriptionId String?            @unique
+  stripePriceId        String?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  updatedAt            DateTime           @updatedAt
+}
+
+model Property {
+  id                     String             @id @default(uuid()) @db.Uuid
+  ownerId                String             @db.Uuid
+  owner                  Profile            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  label                  String
+  type                   PropertyType       @default(HOUSE)
+  status                 PropertyStatus     @default(PROSPECT)
+  acquisitionChannel     AcquisitionChannel @default(JUDICIAL_AUCTION)
+  currency               String             @default("BRL")
+  street                 String?
+  number                 String?
+  complement             String?
+  district               String?
+  city                   String?
+  state                  String?
+  postalCode             String?
+  country                String             @default("BR")
+  areaTotalM2            Decimal?           @db.Decimal(10, 2)
+  areaBuiltM2            Decimal?           @db.Decimal(10, 2)
+  bedrooms               Int?
+  bathrooms              Int?
+  parkingSpots           Int?
+  yearBuilt              Int?
+  purchasePriceCents     Int?
+  purchaseDate           DateTime?          @db.Date
+  appraisedValueCents    Int?
+  marketValueCents       Int?
+  targetSalePriceCents   Int?
+  itbiRateBps            Int?
+  auctionCommissionBps   Int?
+  soldPriceCents         Int?
+  soldDate               DateTime?          @db.Date
+  brokerCommissionBps    Int?
+  capitalGainsRateBps    Int?
+  coverImagePath         String?
+  notes                  String?
+  archivedAt             DateTime?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  expenses       Expense[]
+  tasks          Task[]
+  loans          Loan[]
+  recurringRules RecurringExpenseRule[]
+  attachments    Attachment[]
+
+  @@index([ownerId, status])
+}
+
+model ExpenseCategory {
+  id                     String    @id @default(uuid()) @db.Uuid
+  group                  CostGroup
+  key                    String?
+  name                   String?
+  isSystem               Boolean   @default(false)
+  isRecurringByDefault   Boolean   @default(false)
+  sortOrder              Int       @default(0)
+  ownerId                String?   @db.Uuid
+  owner                  Profile?  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  expenses               Expense[]
+  recurringRules         RecurringExpenseRule[]
+
+  @@unique([key])
+  @@index([ownerId])
+}
+
+model Expense {
+  id                String         @id @default(uuid()) @db.Uuid
+  propertyId        String         @db.Uuid
+  property          Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  categoryId        String         @db.Uuid
+  category          ExpenseCategory @relation(fields: [categoryId], references: [id])
+  description       String
+  amountCents       Int
+  incurredOn        DateTime       @db.Date
+  paidOn            DateTime?      @db.Date
+  status            ExpenseStatus  @default(PAID)
+  paymentMethod     PaymentMethod?
+  contactId         String?        @db.Uuid
+  contact           Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  taskId            String?        @db.Uuid
+  task              Task?          @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  recurringRuleId   String?        @db.Uuid
+  recurringRule     RecurringExpenseRule? @relation(fields: [recurringRuleId], references: [id], onDelete: SetNull)
+  periodKey         String?
+  loanInstallmentId String?        @unique @db.Uuid
+  notes             String?
+  attachments       Attachment[]
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@unique([recurringRuleId, periodKey])
+  @@index([propertyId, incurredOn])
+}
+
+model RecurringExpenseRule {
+  id                   String         @id @default(uuid()) @db.Uuid
+  propertyId           String         @db.Uuid
+  property             Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  categoryId           String         @db.Uuid
+  category             ExpenseCategory @relation(fields: [categoryId], references: [id])
+  description          String
+  estimatedAmountCents Int
+  frequency            Frequency      @default(MONTHLY)
+  dayOfMonth           Int            @default(10)
+  startDate            DateTime       @db.Date
+  endDate              DateTime?      @db.Date
+  autoGenerate         Boolean        @default(true)
+  isActive             Boolean        @default(true)
+  generatedThrough     DateTime?      @db.Date
+  expenses             Expense[]
+}
+
+model Loan {
+  id                    String             @id @default(uuid()) @db.Uuid
+  propertyId            String             @db.Uuid
+  property              Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  lender                String
+  principalCents        Int
+  annualRateBps         Int
+  termMonths            Int
+  system                AmortizationSystem @default(SAC)
+  firstDueDate          DateTime           @db.Date
+  monthlyInsuranceCents Int                @default(0)
+  monthlyAdminFeeCents  Int                @default(0)
+  originationFeeCents   Int                @default(0)
+  installments          LoanInstallment[]
+}
+
+model LoanInstallment {
+  id             String    @id @default(uuid()) @db.Uuid
+  loanId         String    @db.Uuid
+  loan           Loan      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  number         Int
+  dueDate        DateTime  @db.Date
+  principalCents Int
+  interestCents  Int
+  feesCents      Int
+  totalCents     Int
+  paidOn         DateTime? @db.Date
+
+  @@unique([loanId, number])
+}
+
+model Task {
+  id                 String     @id @default(uuid()) @db.Uuid
+  propertyId         String     @db.Uuid
+  property           Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  title              String
+  description        String?
+  status             TaskStatus @default(TODO)
+  categoryId         String?    @db.Uuid
+  contactId          String?    @db.Uuid
+  contact            Contact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  plannedBudgetCents Int?
+  startDate          DateTime?  @db.Date
+  dueDate            DateTime?  @db.Date
+  completedAt        DateTime?
+  sortOrder          Int        @default(0)
+  expenses           Expense[]
+
+  @@index([propertyId, status])
+}
+
+model Contact {
+  id          String    @id @default(uuid()) @db.Uuid
+  ownerId     String    @db.Uuid
+  owner       Profile   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name        String
+  trade       TradeType @default(GENERAL)
+  companyName String?
+  taxId       String?
+  phone       String?
+  whatsapp    String?
+  email       String?
+  city        String?
+  state       String?
+  country     String    @default("BR")
+  rating      Int?
+  isFavorite  Boolean   @default(false)
+  notes       String?
+  expenses    Expense[]
+  tasks       Task[]
+
+  @@index([ownerId, trade])
+}
+
+model Attachment {
+  id          String         @id @default(uuid()) @db.Uuid
+  ownerId     String         @db.Uuid
+  propertyId  String?        @db.Uuid
+  property    Property?      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  expenseId   String?        @db.Uuid
+  expense     Expense?       @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  kind        AttachmentKind @default(RECEIPT)
+  storagePath String         @unique
+  fileName    String
+  mimeType    String
+  sizeBytes   Int
+  createdAt   DateTime       @default(now())
+}
+
+model DealAnalysis {
+  id                     String             @id @default(uuid()) @db.Uuid
+  ownerId                String             @db.Uuid
+  owner                  Profile            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name                   String
+  city                   String?
+  state                  String?
+  country                String             @default("BR")
+  currency               String             @default("BRL")
+  propertyType           PropertyType       @default(APARTMENT)
+  acquisitionChannel     AcquisitionChannel @default(JUDICIAL_AUCTION)
+  areaBuiltM2            Decimal?           @db.Decimal(10, 2)
+  purchasePriceCents     Int                @default(0)
+  appraisedValueCents    Int?
+  auctionCommissionBps   Int                @default(500)
+  itbiRateBps            Int                @default(300)
+  deedAndRegistryCents   Int                @default(0)
+  legalFeesCents         Int                @default(0)
+  arrearsIptuCents       Int                @default(0)
+  arrearsCondoCents      Int                @default(0)
+  evictionCostCents      Int                @default(0)
+  otherAcquisitionCents  Int                @default(0)
+  holdingMonths          Int                @default(6)
+  monthlyHoldingCents    Int                @default(0)
+  financedAmountCents    Int                @default(0)
+  annualRateBps          Int                @default(0)
+  brokerCommissionBps    Int                @default(600)
+  expectedSalePriceCents Int                @default(0)
+  capitalGainsRateBps    Int                @default(1500)
+  convertedPropertyId    String?            @db.Uuid
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  items                  DealAnalysisItem[]
+}
+
+model DealAnalysisItem {
+  id             String       @id @default(uuid()) @db.Uuid
+  analysisId     String       @db.Uuid
+  analysis       DealAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  presetKey      String?
+  label          String
+  categoryKey    String
+  quantity       Decimal      @default(1) @db.Decimal(10, 2)
+  unit           String       @default("un")
+  unitPriceCents Int
+  sortOrder      Int          @default(0)
+}
+
+model RenovationPreset {
+  id                    String @id @default(uuid()) @db.Uuid
+  key                   String @unique
+  categoryKey           String
+  unit                  String
+  defaultUnitPriceCents Int
+  country               String @default("BR")
+  sortOrder             Int    @default(0)
+}
